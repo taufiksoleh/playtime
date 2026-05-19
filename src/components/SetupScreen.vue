@@ -4,6 +4,7 @@ import { ref, watch, computed } from 'vue'
 const STORAGE_KEY = 'playtime.setup.v1'
 
 const defaultSeconds = ref(60)
+const resetOnNext = ref(true)
 const players = ref([
   { name: 'Player 1', seconds: '' },
   { name: 'Player 2', seconds: '' },
@@ -12,6 +13,7 @@ const players = ref([
 const saved = loadSaved()
 if (saved) {
   defaultSeconds.value = saved.defaultSeconds ?? 60
+  resetOnNext.value = saved.resetOnNext ?? true
   players.value = saved.players?.length
     ? saved.players.map((p) => ({ name: p.name ?? '', seconds: p.seconds ?? '' }))
     : players.value
@@ -27,12 +29,16 @@ function loadSaved() {
 }
 
 watch(
-  [defaultSeconds, players],
+  [defaultSeconds, resetOnNext, players],
   () => {
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ defaultSeconds: defaultSeconds.value, players: players.value }),
+        JSON.stringify({
+          defaultSeconds: defaultSeconds.value,
+          resetOnNext: resetOnNext.value,
+          players: players.value,
+        }),
       )
     } catch {
       // storage may be unavailable (private mode); ignore
@@ -89,7 +95,7 @@ function startGame() {
       ? dflt
       : Math.max(1, Number(p.seconds) || dflt),
   }))
-  emit('start', { players: list, defaultSeconds: dflt })
+  emit('start', { players: list, defaultSeconds: dflt, resetOnNext: resetOnNext.value })
 }
 </script>
 
@@ -126,6 +132,14 @@ function startGame() {
         </div>
       </li>
     </ol>
+
+    <label class="toggle">
+      <input type="checkbox" v-model="resetOnNext" />
+      <span>
+        <strong>Reset timer on Next</strong>
+        <em>{{ resetOnNext ? 'Per-turn: refills each player to their full time.' : 'Chess clock: each player has a total time bank.' }}</em>
+      </span>
+    </label>
 
     <div class="bottom-actions">
       <button class="ghost" :disabled="players.length >= 12" @click="addPlayer">+ Add player</button>
@@ -169,6 +183,22 @@ label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; color:
 .row-actions button { padding: 8px 10px; }
 
 .bottom-actions { display: flex; justify-content: space-between; gap: 12px; }
+
+.toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #0b1220;
+  border: 1px solid var(--panel-2);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  cursor: pointer;
+}
+.toggle input { margin-top: 4px; accent-color: var(--accent); width: 18px; height: 18px; }
+.toggle span { display: flex; flex-direction: column; gap: 2px; }
+.toggle strong { font-weight: 600; }
+.toggle em { font-style: normal; color: var(--muted); font-size: 13px; }
 
 @media (max-width: 640px) {
   .row.two { grid-template-columns: 1fr; }

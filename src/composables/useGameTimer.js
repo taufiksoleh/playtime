@@ -5,6 +5,8 @@ export function useGameTimer({ onTimeout } = {}) {
   const currentIndex = ref(0)
   const remainingMs = ref(0)
   const running = ref(false)
+  const resetOnNext = ref(true)
+  const banks = ref([])
 
   let endAt = 0
   let rafId = null
@@ -18,6 +20,11 @@ export function useGameTimer({ onTimeout } = {}) {
     )
   })
 
+  function msFor(index) {
+    const p = players.value[index]
+    return p ? Math.max(1, Number(p.seconds) || 0) * 1000 : 0
+  }
+
   function tick() {
     const now = performance.now()
     const left = endAt - now
@@ -25,6 +32,7 @@ export function useGameTimer({ onTimeout } = {}) {
       remainingMs.value = 0
       running.value = false
       rafId = null
+      if (!resetOnNext.value) banks.value[currentIndex.value] = 0
       if (typeof onTimeout === 'function') onTimeout()
       return
     }
@@ -39,21 +47,19 @@ export function useGameTimer({ onTimeout } = {}) {
     }
   }
 
-  function loadPlayers(list) {
+  function loadPlayers(list, { resetOnNext: ron = true } = {}) {
     players.value = list.map((p) => ({ ...p }))
+    resetOnNext.value = ron
+    banks.value = players.value.map((_, i) => msFor(i))
     currentIndex.value = 0
-    remainingMs.value = msFor(0)
+    remainingMs.value = banks.value[0] ?? 0
     running.value = false
     stopRaf()
   }
 
-  function msFor(index) {
-    const p = players.value[index]
-    return p ? Math.max(1, Number(p.seconds) || 0) * 1000 : 0
-  }
-
   function start() {
     if (!currentPlayer.value || running.value) return
+    if (remainingMs.value <= 0) return
     endAt = performance.now() + remainingMs.value
     running.value = true
     rafId = requestAnimationFrame(tick)
@@ -64,6 +70,7 @@ export function useGameTimer({ onTimeout } = {}) {
     stopRaf()
     remainingMs.value = Math.max(0, endAt - performance.now())
     running.value = false
+    if (!resetOnNext.value) banks.value[currentIndex.value] = remainingMs.value
   }
 
   function resume() {
@@ -75,22 +82,30 @@ export function useGameTimer({ onTimeout } = {}) {
     stopRaf()
     const n = players.value.length
     if (n === 0) return
+    if (!resetOnNext.value) {
+      banks.value[currentIndex.value] = Math.max(0, remainingMs.value)
+    }
     currentIndex.value = (currentIndex.value + 1) % n
-    remainingMs.value = msFor(currentIndex.value)
+    remainingMs.value = resetOnNext.value
+      ? msFor(currentIndex.value)
+      : (banks.value[currentIndex.value] ?? msFor(currentIndex.value))
     running.value = false
-    start()
+    if (remainingMs.value > 0) start()
   }
 
   function resetTurn() {
     stopRaf()
-    remainingMs.value = msFor(currentIndex.value)
+    const full = msFor(currentIndex.value)
+    remainingMs.value = full
+    if (!resetOnNext.value) banks.value[currentIndex.value] = full
     running.value = false
   }
 
   function resetGame() {
     stopRaf()
+    banks.value = players.value.map((_, i) => msFor(i))
     currentIndex.value = 0
-    remainingMs.value = msFor(0)
+    remainingMs.value = banks.value[0] ?? 0
     running.value = false
   }
 
@@ -101,6 +116,8 @@ export function useGameTimer({ onTimeout } = {}) {
     currentIndex,
     remainingMs,
     running,
+    resetOnNext,
+    banks,
     currentPlayer,
     upcoming,
     loadPlayers,

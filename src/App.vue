@@ -5,9 +5,11 @@ import GameScreen from './components/GameScreen.vue'
 
 const phase = ref('setup')
 const players = ref([])
+const resetOnNext = ref(true)
 
 function onStart(payload) {
   players.value = payload.players
+  resetOnNext.value = payload.resetOnNext ?? true
   phase.value = 'game'
 }
 
@@ -24,6 +26,6 @@ function onExit() {
     </div>
 
     <SetupScreen v-if="phase === 'setup'" @start="onStart" />
-    <GameScreen v-else :players="players" @exit="onExit" />
+    <GameScreen v-else :players="players" :reset-on-next="resetOnNext" @exit="onExit" />
   </main>
 </template>

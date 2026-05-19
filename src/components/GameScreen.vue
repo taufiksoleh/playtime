@@ -4,6 +4,7 @@ import { useGameTimer, formatTime, beep } from '../composables/useGameTimer.js'
 
 const props = defineProps({
   players: { type: Array, required: true },
+  resetOnNext: { type: Boolean, default: true },
 })
 const emit = defineEmits(['exit'])
 
@@ -15,12 +16,12 @@ const timer = useGameTimer({
 })
 
 onMounted(() => {
-  timer.loadPlayers(props.players)
+  timer.loadPlayers(props.players, { resetOnNext: props.resetOnNext })
 })
 
 watch(
-  () => props.players,
-  (list) => timer.loadPlayers(list),
+  () => [props.players, props.resetOnNext],
+  ([list, ron]) => timer.loadPlayers(list, { resetOnNext: ron }),
   { deep: true },
 )
 
@@ -31,6 +32,16 @@ const pct = computed(() => {
   return Math.max(0, Math.min(100, (timer.remainingMs.value / total) * 100))
 })
 const lowTime = computed(() => timer.remainingMs.value > 0 && timer.remainingMs.value <= 5000)
+
+function upcomingTime(offset) {
+  const n = timer.players.value.length
+  if (n === 0) return 0
+  const idx = (timer.currentIndex.value + offset + 1) % n
+  if (timer.resetOnNext.value) {
+    return (timer.players.value[idx]?.seconds ?? 0) * 1000
+  }
+  return timer.banks.value[idx] ?? 0
+}
 
 function confirmReset() {
   if (confirm('Reset the game and return to setup?')) {
@@ -44,7 +55,10 @@ function confirmReset() {
   <section class="panel game">
     <header class="head">
       <div>
-        <div class="label">Current turn</div>
+        <div class="label">
+          Current turn
+          <span class="mode-badge">{{ timer.resetOnNext.value ? 'Per-turn' : 'Chess clock' }}</span>
+        </div>
         <div class="player-name">{{ timer.currentPlayer.value?.name ?? '—' }}</div>
       </div>
       <div class="turn-index">{{ timer.currentIndex.value + 1 }} / {{ timer.players.value.length }}</div>
@@ -74,7 +88,7 @@ function confirmReset() {
         <li v-for="(p, i) in timer.upcoming.value" :key="i">
           <span class="num">{{ i + 1 }}</span>
           <span class="name">{{ p.name }}</span>
-          <span class="time">{{ formatTime(p.seconds * 1000) }}</span>
+          <span class="time">{{ formatTime(upcomingTime(i)) }}</span>
         </li>
       </ol>
     </div>
@@ -88,7 +102,16 @@ function confirmReset() {
 <style scoped>
 .game { display: flex; flex-direction: column; gap: 18px; }
 .head { display: flex; justify-content: space-between; align-items: flex-end; }
-.label { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+.label { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 10px; }
+.mode-badge {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11px;
+  background: var(--panel-2);
+  color: var(--text);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
 .player-name { font-size: 30px; font-weight: 700; margin-top: 2px; }
 .turn-index { color: var(--muted); font-variant-numeric: tabular-nums; }
 
