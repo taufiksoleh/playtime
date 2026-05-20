@@ -17,9 +17,20 @@ export function useLeaderboard() {
     } catch {}
   }
 
+  function updatePlayerPoints(entryId, playerIndex, points) {
+    const all = load()
+    const entry = all.find(e => e.id === entryId)
+    if (entry?.players?.[playerIndex] !== undefined) {
+      entry.players[playerIndex].points = points
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(all))
+      } catch {}
+    }
+  }
+
   function clear() {
     localStorage.removeItem(STORAGE_KEY)
   }
 
-  return { load, save, clear }
+  return { load, save, updatePlayerPoints, clear }
 }
