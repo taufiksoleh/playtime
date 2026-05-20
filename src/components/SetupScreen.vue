@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
+import PlayerAvatar from './PlayerAvatar.vue'
 
 const STORAGE_KEY = 'playtime.setup.v1'
 
@@ -78,7 +79,7 @@ function addPlayer() {
   players.value.push({ name: `Player ${players.value.length + 1}`, seconds: '' })
 }
 
-const emit = defineEmits(['start'])
+const emit = defineEmits(['start', 'leaderboard'])
 
 const canStart = computed(() =>
   players.value.length >= 2 &&
@@ -101,8 +102,13 @@ function startGame() {
 
 <template>
   <section class="panel setup">
-    <h2>Game setup</h2>
-    <p class="muted">Configure players, turn order, and time per turn.</p>
+    <div class="setup-header">
+      <div>
+        <h2>Game setup</h2>
+        <p class="muted">Configure players, turn order, and time per turn.</p>
+      </div>
+      <button class="ghost trophy-btn" @click="$emit('leaderboard')" title="View leaderboard">🏆</button>
+    </div>
 
     <div class="row two">
       <label>
@@ -117,7 +123,7 @@ function startGame() {
 
     <ol class="players">
       <li v-for="(p, i) in players" :key="i">
-        <div class="order">{{ i + 1 }}</div>
+        <PlayerAvatar class="player-avatar" :name="p.name || String(i + 1)" :index="i" size="36px" />
         <input type="text" placeholder="Player name" v-model="p.name" />
         <input
           type="number"
@@ -149,8 +155,17 @@ function startGame() {
 </template>
 
 <style scoped>
-.setup h2 { margin: 0 0 4px; }
-.muted { color: var(--muted); margin: 0 0 18px; }
+.setup { position: relative; }
+.setup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+.setup-header h2 { margin: 0 0 4px; }
+.muted { color: var(--muted); margin: 0; }
+
+.trophy-btn { font-size: 18px; padding: 8px 12px; }
 
 .row.two {
   display: grid;
@@ -163,21 +178,13 @@ label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; color:
 .players { list-style: none; padding: 0; margin: 0 0 16px; display: flex; flex-direction: column; gap: 10px; }
 .players li {
   display: grid;
-  grid-template-columns: 32px 1.4fr 1fr auto;
+  grid-template-columns: 36px 1.4fr 1fr auto;
   gap: 10px;
   align-items: center;
   background: #0b1220;
   border: 1px solid var(--panel-2);
   border-radius: 10px;
   padding: 10px 12px;
-}
-.order {
-  width: 32px; height: 32px;
-  display: grid; place-items: center;
-  border-radius: 50%;
-  background: var(--panel-2);
-  color: var(--text);
-  font-weight: 600;
 }
 .row-actions { display: flex; gap: 6px; }
 .row-actions button { padding: 8px 10px; }
@@ -202,12 +209,13 @@ label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; color:
 
 @media (max-width: 640px) {
   .row.two { grid-template-columns: 1fr; }
-  .players li { grid-template-columns: 32px 1fr; grid-template-areas:
-    "order name"
-    "order time"
-    "actions actions"; }
-  .players li > input[type="text"] { grid-area: name; }
-  .players li > input[type="number"] { grid-area: time; }
-  .row-actions { grid-area: actions; justify-content: flex-end; }
+  .players li {
+    grid-template-columns: 36px 1fr;
+    grid-template-rows: auto auto auto;
+  }
+  .player-avatar { grid-row: 1 / 3; }
+  .players li > input[type="text"] { grid-column: 2; grid-row: 1; }
+  .players li > input[type="number"] { grid-column: 2; grid-row: 2; }
+  .row-actions { grid-column: 1 / -1; grid-row: 3; justify-content: flex-end; }
 }
 </style>

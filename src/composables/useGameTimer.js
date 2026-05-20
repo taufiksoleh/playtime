@@ -8,6 +8,11 @@ export function useGameTimer({ onTimeout } = {}) {
   const resetOnNext = ref(true)
   const banks = ref([])
 
+  const stats = ref([])
+  const turnSuccess = ref(false)
+  let timedOut = false
+  let turnStartMs = 0
+
   let endAt = 0
   let rafId = null
 
@@ -25,6 +30,21 @@ export function useGameTimer({ onTimeout } = {}) {
     return p ? Math.max(1, Number(p.seconds) || 0) * 1000 : 0
   }
 
+  function initStats() {
+    stats.value = players.value.map(() => ({
+      turns: 0,
+      totalUsedMs: 0,
+      fastestMs: Infinity,
+      slowestMs: 0,
+      timeouts: 0,
+      streak: 0,
+    }))
+  }
+
+  function resetStats() {
+    initStats()
+  }
+
   function tick() {
     const now = performance.now()
     const left = endAt - now
@@ -32,6 +52,7 @@ export function useGameTimer({ onTimeout } = {}) {
       remainingMs.value = 0
       running.value = false
       rafId = null
+      timedOut = true
       if (!resetOnNext.value) banks.value[currentIndex.value] = 0
       if (typeof onTimeout === 'function') onTimeout()
       return
@@ -54,7 +75,10 @@ export function useGameTimer({ onTimeout } = {}) {
     currentIndex.value = 0
     remainingMs.value = banks.value[0] ?? 0
     running.value = false
+    timedOut = false
+    turnStartMs = remainingMs.value
     stopRaf()
+    initStats()
   }
 
   function start() {
@@ -82,6 +106,28 @@ export function useGameTimer({ onTimeout } = {}) {
     stopRaf()
     const n = players.value.length
     if (n === 0) return
+
+    const wasTimeout = timedOut
+    timedOut = false
+    const s = stats.value[currentIndex.value]
+    if (s) {
+      const usedMs = Math.max(0, turnStartMs - Math.max(0, remainingMs.value))
+      s.turns++
+      s.totalUsedMs += usedMs
+      if (wasTimeout) {
+        s.timeouts++
+        s.streak = 0
+      } else {
+        if (usedMs < s.fastestMs) s.fastestMs = usedMs
+        if (usedMs > s.slowestMs) s.slowestMs = usedMs
+        s.streak++
+      }
+    }
+
+    if (!wasTimeout) {
+      turnSuccess.value = true
+    }
+
     if (!resetOnNext.value) {
       banks.value[currentIndex.value] = Math.max(0, remainingMs.value)
     }
@@ -89,6 +135,7 @@ export function useGameTimer({ onTimeout } = {}) {
     remainingMs.value = resetOnNext.value
       ? msFor(currentIndex.value)
       : (banks.value[currentIndex.value] ?? msFor(currentIndex.value))
+    turnStartMs = remainingMs.value
     running.value = false
     if (remainingMs.value > 0) start()
   }
@@ -97,6 +144,7 @@ export function useGameTimer({ onTimeout } = {}) {
     stopRaf()
     const full = msFor(currentIndex.value)
     remainingMs.value = full
+    turnStartMs = full
     if (!resetOnNext.value) banks.value[currentIndex.value] = full
     running.value = false
   }
@@ -106,7 +154,10 @@ export function useGameTimer({ onTimeout } = {}) {
     banks.value = players.value.map((_, i) => msFor(i))
     currentIndex.value = 0
     remainingMs.value = banks.value[0] ?? 0
+    turnStartMs = remainingMs.value
     running.value = false
+    timedOut = false
+    initStats()
   }
 
   onBeforeUnmount(stopRaf)
@@ -120,6 +171,9 @@ export function useGameTimer({ onTimeout } = {}) {
     banks,
     currentPlayer,
     upcoming,
+    stats,
+    resetStats,
+    turnSuccess,
     loadPlayers,
     start,
     pause,
