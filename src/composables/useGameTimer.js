@@ -13,16 +13,28 @@ export function useGameTimer({ onTimeout } = {}) {
   let timedOut = false
   let turnStartMs = 0
 
+  const finished = ref([])
+  let finishCounter = 0
+
   let endAt = 0
   let rafId = null
 
   const currentPlayer = computed(() => players.value[currentIndex.value] ?? null)
+  const allFinished = computed(() =>
+    finished.value.length > 0 && finished.value.every(Boolean)
+  )
   const upcoming = computed(() => {
     const n = players.value.length
     if (n === 0) return []
-    return Array.from({ length: Math.min(3, n - 1) }, (_, i) =>
-      players.value[(currentIndex.value + i + 1) % n],
-    )
+    const result = []
+    let step = 1
+    while (result.length < 3 && step <= n) {
+      const idx = (currentIndex.value + step) % n
+      if (!finished.value[idx])
+        result.push({ ...players.value[idx], playerIndex: idx })
+      step++
+    }
+    return result
   })
 
   function msFor(index) {
@@ -38,6 +50,7 @@ export function useGameTimer({ onTimeout } = {}) {
       slowestMs: 0,
       timeouts: 0,
       streak: 0,
+      finishRank: 0,
     }))
   }
 
@@ -77,6 +90,8 @@ export function useGameTimer({ onTimeout } = {}) {
     running.value = false
     timedOut = false
     turnStartMs = remainingMs.value
+    finished.value = players.value.map(() => false)
+    finishCounter = 0
     stopRaf()
     initStats()
   }
@@ -131,10 +146,74 @@ export function useGameTimer({ onTimeout } = {}) {
     if (!resetOnNext.value) {
       banks.value[currentIndex.value] = Math.max(0, remainingMs.value)
     }
-    currentIndex.value = (currentIndex.value + 1) % n
+
+    let nextIdx = (currentIndex.value + 1) % n
+    let steps = 0
+    while (finished.value[nextIdx] && steps < n) {
+      nextIdx = (nextIdx + 1) % n
+      steps++
+    }
+    if (steps >= n) {
+      running.value = false
+      return
+    }
+
+    currentIndex.value = nextIdx
     remainingMs.value = resetOnNext.value
       ? msFor(currentIndex.value)
       : (banks.value[currentIndex.value] ?? msFor(currentIndex.value))
+    turnStartMs = remainingMs.value
+    running.value = false
+    if (remainingMs.value > 0) start()
+  }
+
+  function markFinished() {
+    stopRaf()
+    const idx = currentIndex.value
+    if (finished.value[idx]) return
+
+    const wasTimeout = timedOut
+    timedOut = false
+    const s = stats.value[idx]
+    if (s) {
+      const usedMs = Math.max(0, turnStartMs - Math.max(0, remainingMs.value))
+      s.turns++
+      s.totalUsedMs += usedMs
+      if (wasTimeout) {
+        s.timeouts++
+        s.streak = 0
+      } else {
+        if (usedMs < s.fastestMs) s.fastestMs = usedMs
+        if (usedMs > s.slowestMs) s.slowestMs = usedMs
+        s.streak++
+      }
+    }
+
+    finishCounter++
+    finished.value[idx] = true
+    if (s) s.finishRank = finishCounter
+
+    if (!resetOnNext.value) {
+      banks.value[idx] = 0
+    }
+
+    const remaining = finished.value.filter(f => !f).length
+    if (remaining === 0) {
+      running.value = false
+      return
+    }
+
+    const n = players.value.length
+    let nextIdx = (idx + 1) % n
+    let steps = 0
+    while (finished.value[nextIdx] && steps < n) {
+      nextIdx = (nextIdx + 1) % n
+      steps++
+    }
+    currentIndex.value = nextIdx
+    remainingMs.value = resetOnNext.value
+      ? msFor(nextIdx)
+      : (banks.value[nextIdx] ?? msFor(nextIdx))
     turnStartMs = remainingMs.value
     running.value = false
     if (remainingMs.value > 0) start()
@@ -157,6 +236,8 @@ export function useGameTimer({ onTimeout } = {}) {
     turnStartMs = remainingMs.value
     running.value = false
     timedOut = false
+    finished.value = players.value.map(() => false)
+    finishCounter = 0
     initStats()
   }
 
@@ -174,11 +255,14 @@ export function useGameTimer({ onTimeout } = {}) {
     stats,
     resetStats,
     turnSuccess,
+    finished,
+    allFinished,
     loadPlayers,
     start,
     pause,
     resume,
     next,
+    markFinished,
     resetTurn,
     resetGame,
   }
