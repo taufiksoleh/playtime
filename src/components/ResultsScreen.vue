@@ -16,10 +16,16 @@ const { save } = useLeaderboard()
 
 const ranked = computed(() =>
   props.players.map((p, i) => {
-    const s = props.stats[i] ?? { turns: 0, totalUsedMs: 0, fastestMs: 0, slowestMs: 0, timeouts: 0, streak: 0 }
+    const s = props.stats[i] ?? { turns: 0, totalUsedMs: 0, fastestMs: 0, slowestMs: 0, timeouts: 0, streak: 0, finishRank: 0 }
     const avgMs = s.turns > 0 ? s.totalUsedMs / s.turns : Infinity
-    return { ...p, ...s, originalIndex: i, avgMs }
-  }).sort((a, b) => a.avgMs - b.avgMs)
+    const finishRank = s.finishRank ?? 0
+    return { ...p, ...s, originalIndex: i, avgMs, finishRank }
+  }).sort((a, b) => {
+    if (a.finishRank > 0 && b.finishRank > 0) return a.finishRank - b.finishRank
+    if (a.finishRank > 0) return -1
+    if (b.finishRank > 0) return 1
+    return a.avgMs - b.avgMs
+  })
 )
 
 const top3 = computed(() => ranked.value.slice(0, Math.min(3, ranked.value.length)))
@@ -109,6 +115,7 @@ function handleSave() {
               <PlayerAvatar :name="p.name" :index="p.originalIndex" size="28px" />
               <span>{{ p.name }}</span>
               <span v-if="rank === 0 && !noData" class="crown">👑</span>
+              <span v-if="p.finishRank > 0" class="finish-badge">#{{ p.finishRank }}</span>
             </td>
             <td>{{ p.turns }}</td>
             <td>{{ fmtAvg(p) }}</td>
@@ -194,6 +201,15 @@ function handleSave() {
 .stats-table tr:last-child td { border-bottom: none; }
 .player-cell { display: flex; align-items: center; gap: 8px; }
 .crown { font-size: 14px; }
+.finish-badge {
+  font-size: 11px;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  color: #38bdf8;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-weight: 600;
+}
 .text-danger { color: var(--danger); }
 
 .actions {

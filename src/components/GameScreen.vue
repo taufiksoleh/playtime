@@ -60,16 +60,7 @@ const lowTime = computed(() => timer.remainingMs.value > 0 && timer.remainingMs.
 const flashDanger = computed(() => lowTime.value && timer.running.value)
 const currentStreak = computed(() => timer.stats.value[timer.currentIndex.value]?.streak ?? 0)
 
-function upcomingIndex(offset) {
-  const n = timer.players.value.length
-  if (n === 0) return 0
-  return (timer.currentIndex.value + offset + 1) % n
-}
-
-function upcomingTime(offset) {
-  const n = timer.players.value.length
-  if (n === 0) return 0
-  const idx = (timer.currentIndex.value + offset + 1) % n
+function upcomingTime(idx) {
   if (timer.resetOnNext.value) {
     return (timer.players.value[idx]?.seconds ?? 0) * 1000
   }
@@ -88,16 +79,25 @@ watch(timer.turnSuccess, (val) => {
   }
 })
 
+function buildSnapshot() {
+  return timer.stats.value.map(s => ({
+    ...s,
+    fastestMs: s.fastestMs === Infinity ? 0 : s.fastestMs,
+  }))
+}
+
 function endGame() {
   if (confirm('End the game and see results?')) {
     timer.pause()
-    const snapshot = timer.stats.value.map(s => ({
-      ...s,
-      fastestMs: s.fastestMs === Infinity ? 0 : s.fastestMs,
-    }))
-    emit('endGame', snapshot)
+    emit('endGame', buildSnapshot())
   }
 }
+
+watch(() => timer.allFinished.value, (done) => {
+  if (!done) return
+  timer.pause()
+  emit('endGame', buildSnapshot())
+})
 </script>
 
 <template>
@@ -157,16 +157,17 @@ function endGame() {
         {{ timer.running.value ? 'Pause' : 'Resume' }}
       </button>
       <button class="ghost" @click="timer.resetTurn()">Reset turn</button>
+      <button class="ghost done-btn" @click="timer.markFinished()">Done 🏁</button>
       <button class="primary big" @click="timer.next()">Next →</button>
     </div>
 
     <div v-if="timer.upcoming.value.length" class="upcoming">
       <div class="label">Up next</div>
       <ol>
-        <li v-for="(p, i) in timer.upcoming.value" :key="i">
-          <PlayerAvatar :name="p.name" :index="upcomingIndex(i)" size="28px" />
+        <li v-for="p in timer.upcoming.value" :key="p.playerIndex">
+          <PlayerAvatar :name="p.name" :index="p.playerIndex" size="28px" />
           <span class="name">{{ p.name }}</span>
-          <span class="time">{{ formatTime(upcomingTime(i)) }}</span>
+          <span class="time">{{ formatTime(upcomingTime(p.playerIndex)) }}</span>
         </li>
       </ol>
     </div>
@@ -245,7 +246,7 @@ function endGame() {
 .bar { height: 10px; background: #0b1220; border-radius: 999px; overflow: hidden; }
 .bar-fill { height: 100%; transition: width 0.15s linear, background 0.4s ease; }
 
-.controls { display: grid; grid-template-columns: 1fr 1fr 1.6fr; gap: 10px; }
+.controls { display: grid; grid-template-columns: 1fr 1fr 1fr 1.6fr; gap: 10px; }
 .controls .big { padding: 18px; font-size: 18px; }
 
 .upcoming ol { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 6px; }
@@ -266,6 +267,7 @@ function endGame() {
 @media (max-width: 520px) {
   .controls { grid-template-columns: 1fr 1fr; }
   .controls .big { grid-column: 1 / -1; }
+  .controls .done-btn { grid-column: 1 / -1; }
   .player-name { font-size: 22px; }
 }
 </style>
