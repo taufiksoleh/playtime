@@ -108,3 +108,54 @@ input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   box-shadow: var(--shadow);
   padding: 20px;
 }
+
+/* === Phase transitions === */
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.fade-slide-enter-from { opacity: 0; transform: translateY(16px); }
+.fade-slide-leave-to   { opacity: 0; transform: translateY(-16px); }
+
+/* === Leaderboard expand === */
+.expand-enter-active,
+.expand-leave-active {
+  transition: max-height 0.3s ease, opacity 0.2s ease;
+  overflow: hidden;
+}
+.expand-enter-from,
+.expand-leave-to { max-height: 0 !important; opacity: 0; }
+.expand-enter-to,
+.expand-leave-from { max-height: 600px; }
+
+/* === Global keyframes === */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25%       { transform: translateX(-5px); }
+  75%       { transform: translateX(5px); }
+}
+
+@keyframes bgFlash {
+  0%, 100% { background: var(--panel); }
+  50%       { background: rgba(244, 63, 94, 0.18); }
+}
+
+@keyframes confettiBurst {
+  0%   { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+  100% { transform: translate(var(--tx, 60px), var(--ty, -80px)) rotate(var(--rot, 360deg)) scale(0.4); opacity: 0; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes playerIn {
+  from { opacity: 0; transform: translateX(30px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes playerOut {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(-30px); }
+}
