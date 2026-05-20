@@ -6,11 +6,27 @@ import { formatTime } from '../composables/useGameTimer.js'
 
 const emit = defineEmits(['back'])
 
-const { load, clear } = useLeaderboard()
+const { load, clear, updatePlayerPoints } = useLeaderboard()
 const entries = ref([])
 const expandedId = ref(null)
 
 onMounted(() => { entries.value = load() })
+
+function adjustPoints(entryId, playerIndex, delta) {
+  const entry = entries.value.find(e => e.id === entryId)
+  if (!entry) return
+  const player = entry.players[playerIndex]
+  player.points = Math.max(0, (player.points ?? 0) + delta)
+  updatePlayerPoints(entryId, playerIndex, player.points)
+}
+
+function handlePointsInput(entryId, playerIndex, value) {
+  const entry = entries.value.find(e => e.id === entryId)
+  if (!entry) return
+  const player = entry.players[playerIndex]
+  player.points = Math.max(0, parseInt(value) || 0)
+  updatePlayerPoints(entryId, playerIndex, player.points)
+}
 
 function toggleExpand(id) {
   expandedId.value = expandedId.value === id ? null : id
@@ -72,6 +88,7 @@ function fmtAvg(p) {
                   <th>Avg</th>
                   <th>Timeouts</th>
                   <th>Streak</th>
+                  <th>Points</th>
                 </tr>
               </thead>
               <tbody>
@@ -89,6 +106,17 @@ function fmtAvg(p) {
                   <td>{{ fmtAvg(p) }}</td>
                   <td :class="{ 'text-danger': p.timeouts > 0 }">{{ p.timeouts }}</td>
                   <td>{{ p.streak > 0 ? `🔥 ${p.streak}` : '—' }}</td>
+                  <td class="points-cell">
+                    <button class="pts-btn" @click.stop="adjustPoints(e.id, i, -1)">−</button>
+                    <input
+                      type="number"
+                      class="pts-input"
+                      :value="p.points ?? 0"
+                      min="0"
+                      @change.stop="handlePointsInput(e.id, i, $event.target.value)"
+                    />
+                    <button class="pts-btn" @click.stop="adjustPoints(e.id, i, 1)">+</button>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -174,6 +202,37 @@ function fmtAvg(p) {
 .text-danger { color: var(--danger); }
 
 .lb-footer { display: flex; justify-content: flex-end; }
+
+.points-cell { display: flex; align-items: center; gap: 3px; }
+.pts-btn {
+  width: 22px; height: 22px;
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.pts-btn:hover { background: rgba(148, 163, 184, 0.2); }
+.pts-input {
+  width: 44px;
+  text-align: center;
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 13px;
+  padding: 2px 4px;
+  font-variant-numeric: tabular-nums;
+}
+.pts-input:focus { outline: none; border-color: var(--accent, #6366f1); }
+.pts-input::-webkit-inner-spin-button,
+.pts-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+.pts-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 
 @media (max-width: 520px) {
   .session-summary { grid-template-columns: 1fr auto auto; }
